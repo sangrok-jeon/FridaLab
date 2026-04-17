@@ -395,6 +395,19 @@ scripts/FridaLab.js
 frida -U -f uk.rossmarks.fridalab -l scripts/FridaLab.js
 ```
 
+개별 Challenge 단독 실행 스크립트도 함께 정리했습니다.
+
+| Challenge | Script |
+| --- | --- |
+| 01 | `scripts/chall01.js` |
+| 02 | `scripts/chall02.js` |
+| 03 | `scripts/chall03.js` |
+| 04 | `scripts/chall04.js` |
+| 05 | `scripts/chall05.js` |
+| 06 | `scripts/chall06.js` |
+| 07 | `scripts/chall07.js` |
+| 08 | `scripts/chall08.js` |
+
 ## 최종 결과
 
 Frida를 이용해 1번부터 8번까지 모든 Challenge의 검증 조건을 통과시켰습니다.
