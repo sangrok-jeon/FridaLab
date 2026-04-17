@@ -11,43 +11,6 @@ Android 동적 분석 실습 앱인 FridaLab을 대상으로 Frida를 활용해 
 - Tools: ADB, Frida, frida-server, JADX / JADX-GUI
 - Target Package: `uk.rossmarks.fridalab`
 
-## Frida 기본 명령어
-
-연결된 Frida 디바이스 확인:
-
-```bash
-frida-ls-devices
-```
-
-USB로 연결된 디바이스의 설치 앱 목록 확인:
-
-```bash
-frida-ps -Uai
-```
-
-앱을 새로 실행하면서 Frida 스크립트 로드:
-
-```bash
-frida -U -f uk.rossmarks.fridalab -l scripts/FridaLab.js
-```
-
-이미 실행 중인 프로세스에 attach:
-
-```bash
-frida -U -n FridaLab -l scripts/FridaLab.js
-```
-
-## Frida 옵션 정리
-
-| 옵션 | 의미 |
-| --- | --- |
-| `-U` | USB로 연결된 디바이스 사용 |
-| `-a` | applications 목록 표시 |
-| `-i` | installed applications 포함 |
-| `-f` | package identifier 기준으로 앱을 spawn |
-| `-n` | process name 기준으로 실행 중인 프로세스에 attach |
-| `-l` | JavaScript hook script 로드 |
-
 ## 초기 상태
 
 앱 실행 직후에는 모든 Challenge가 빨간색으로 표시됩니다.
