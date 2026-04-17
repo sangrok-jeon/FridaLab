@@ -342,7 +342,7 @@ Java.scheduleOnMainThread(() => {
 
 Challenge 08까지 통과하면 1번부터 8번까지 모든 항목이 초록색으로 표시됩니다.
 
-![Challenge 08 및 전체 완료 결과](image/all-solved.png)
+![Challenge 08 결과](image/chall08-result.png)
 
 ## 최종 스크립트
 
@@ -375,7 +375,7 @@ frida -U -f uk.rossmarks.fridalab -l scripts/FridaLab.js
 
 Frida를 이용해 1번부터 8번까지 모든 Challenge의 검증 조건을 통과시켰습니다.
 
-![전체 완료 결과](image/all-solved.png)
+![전체 완료 결과](image/chall08-result.png)
 
 ## 참고
 
