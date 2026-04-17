@@ -1,62 +1,79 @@
-# FridaLab Write-up
+# FridaLab 분석 및 풀이
 
-Android dynamic instrumentation practice using FridaLab and Frida.
+Android 동적 분석 실습 앱인 FridaLab을 대상으로 Frida를 활용해 Java 메서드 후킹, 정적 필드 확인, 런타임 인자 변조, UI 객체 조작을 수행한 포트폴리오입니다.
 
-This repository documents my FridaLab practice as a portfolio project. The focus is not only on solving each challenge, but also on explaining how the target logic was identified from the decompiled code and how Frida was used to manipulate runtime behavior.
+이 문서는 단순히 정답 스크립트를 나열하는 것이 아니라, 디컴파일된 코드에서 검증 로직을 확인하고 Frida를 통해 런타임 동작을 어떻게 조작했는지 정리하는 것을 목표로 합니다.
 
-## Environment
+## 분석 환경
 
 - Host OS: Windows
-- Target: Android Emulator / Android Device
+- Target Device: Android Emulator / Android Device
 - Tools: ADB, Frida, frida-server, JADX / JADX-GUI
-- Target app: FridaLab
+- Target Package: `uk.rossmarks.fridalab`
 
-## Basic Frida Commands
+## Frida 기본 명령어
 
-List connected Frida devices:
+연결된 Frida 디바이스 확인:
 
 ```bash
 frida-ls-devices
 ```
 
-List installed applications on a USB-connected device:
+USB로 연결된 디바이스의 설치 앱 목록 확인:
 
 ```bash
 frida-ps -Uai
 ```
 
-Run the target app and load a Frida script:
+앱을 새로 실행하면서 Frida 스크립트 로드:
 
 ```bash
-frida -U -f uk.rossmarks.fridalab -l scripts/chall01.js
+frida -U -f uk.rossmarks.fridalab -l scripts/FridaLab.js
 ```
 
-Attach to an already running process:
+이미 실행 중인 프로세스에 attach:
 
 ```bash
-frida -U -n FridaLab -l scripts/chall01.js
+frida -U -n FridaLab -l scripts/FridaLab.js
 ```
 
-## Frida Option Notes
+## Frida 옵션 정리
 
-| Option | Meaning |
+| 옵션 | 의미 |
 | --- | --- |
-| `-U` | Use a USB-connected device |
-| `-a` | Show applications |
-| `-i` | Include installed applications |
-| `-f` | Spawn an app by package identifier |
-| `-n` | Attach to a running process by process name |
-| `-l` | Load a JavaScript hook script |
+| `-U` | USB로 연결된 디바이스 사용 |
+| `-a` | applications 목록 표시 |
+| `-i` | installed applications 포함 |
+| `-f` | package identifier 기준으로 앱을 spawn |
+| `-n` | process name 기준으로 실행 중인 프로세스에 attach |
+| `-l` | JavaScript hook script 로드 |
 
-## Challenge 01 - Static Field / Return Value Manipulation
+## 초기 상태
 
-### Goal
+앱 실행 직후에는 모든 Challenge가 빨간색으로 표시됩니다.
 
-Change class `challenge_01`'s variable `chall01` to `1`.
+![초기 상태](image/initial-state.png)
 
-### Decompiled Code
+## Challenge 요약
 
-The `challenge_01` class has a static integer field and a getter method.
+| Challenge | 주요 기법 | 상태 |
+| --- | --- | --- |
+| 01 | Static field / return value 조작 | Solved |
+| 02 | Private method 호출 | Solved |
+| 03 | Boolean return hook | Solved |
+| 04 | Method argument 전달 | Solved |
+| 05 | Runtime argument 변조 | Solved |
+| 06 | Time-based condition 처리 | Solved |
+| 07 | Runtime PIN 값 확인 | Solved |
+| 08 | UI text 조작 | Solved |
+
+## Challenge 01 - Static Field / Return Value 조작
+
+### 목표
+
+`challenge_01` 클래스의 `chall01` 값을 `1`로 만들어 검증 조건을 통과시키는 문제입니다.
+
+### 원본 코드
 
 ```java
 public class challenge_01 {
@@ -68,7 +85,7 @@ public class challenge_01 {
 }
 ```
 
-In `MainActivity`, the app checks whether `getChall01Int()` returns `1`.
+`MainActivity`에서는 다음과 같이 `getChall01Int()`의 반환값을 검사합니다.
 
 ```java
 if (challenge_01.getChall01Int() == 1) {
@@ -76,37 +93,314 @@ if (challenge_01.getChall01Int() == 1) {
 }
 ```
 
-### Analysis
+### 분석
 
-The static integer `chall01` is not explicitly initialized, so its default value is `0`.
+`chall01`은 명시적으로 초기화되지 않은 static int 필드이므로 기본값은 `0`입니다. 따라서 원래 상태에서는 `getChall01Int()`가 `0`을 반환하고 조건문을 통과할 수 없습니다.
 
-The challenge is completed only when `challenge_01.getChall01Int()` returns `1`. Therefore, the target can be solved by changing the static field value or by hooking the getter method and replacing its return value at runtime.
+### Frida 접근
 
-For this solution, I used Frida to hook `getChall01Int()` and force it to return `1`.
-
-### Frida Script
+`getChall01Int()`를 후킹하여 항상 `1`을 반환하도록 변경했습니다.
 
 ```javascript
-Java.perform(() => {
-    const Challenge01 = Java.use("uk.rossmarks.fridalab.challenge_01");
+Challenge01.getChall01Int.implementation = () => {
+    return 1;
+};
+```
 
-    Challenge01.getChall01Int.implementation = () => {
-        console.log("[+] chall01 solved");
-        return 1;
-    };
+### 실행 결과
+
+![Challenge 01 결과](image/chall01-result.png)
+
+## Challenge 02 - Private Method 호출
+
+### 목표
+
+`chall02()`를 실행하여 `completeArr[1]` 값을 `1`로 변경하는 문제입니다.
+
+### 원본 코드
+
+```java
+private void chall02() {
+    this.completeArr[1] = 1;
+}
+```
+
+### 분석
+
+`chall02()`는 `completeArr[1]`을 직접 `1`로 변경하지만, private method이므로 일반적인 외부 호출이 불가능합니다. Frida를 사용하면 런타임에 생성된 `MainActivity` 인스턴스를 찾아 private method를 직접 호출할 수 있습니다.
+
+### Frida 접근
+
+`Java.choose()`로 `MainActivity` 인스턴스를 찾은 뒤 `chall02()`를 호출했습니다.
+
+```javascript
+Java.choose("uk.rossmarks.fridalab.MainActivity", {
+    onMatch: (instance) => {
+        instance.chall02();
+    }
 });
 ```
 
-The same script is available at [`scripts/chall01.js`](scripts/chall01.js).
+### 실행 결과
 
-### Run
+![Challenge 02 결과](image/chall02-result.png)
 
-```bash
-frida -U -f uk.rossmarks.fridalab -l scripts/chall01.js
+## Challenge 03 - Boolean Return Hook
+
+### 목표
+
+항상 `false`를 반환하는 `chall03()`의 결과를 `true`로 변경하는 문제입니다.
+
+### 원본 코드
+
+```java
+public boolean chall03() {
+    return false;
+}
 ```
 
-After loading the script, pressing the `CHECK` button makes Challenge 01 pass.
+검증 로직은 다음과 같습니다.
 
-## Notes
+```java
+if (MainActivity.this.chall03()) {
+    MainActivity.this.completeArr[2] = 1;
+}
+```
 
-This project is for educational Android dynamic analysis practice. No real service or third-party production application was targeted.
+### 분석
+
+`chall03()`이 항상 `false`를 반환하기 때문에 원래 상태에서는 조건문을 통과할 수 없습니다.
+
+### Frida 접근
+
+`chall03()`을 후킹하여 `true`를 반환하도록 변경했습니다.
+
+```javascript
+MainActivity.chall03.implementation = () => {
+    return true;
+};
+```
+
+### 실행 결과
+
+![Challenge 03 결과](image/chall03-result.png)
+
+## Challenge 04 - Method Argument 전달
+
+### 목표
+
+`chall04()`에 `"frida"` 문자열을 전달하여 검증 조건을 만족시키는 문제입니다.
+
+### 원본 코드
+
+```java
+public void chall04(String str) {
+    if (str.equals("frida")) {
+        this.completeArr[3] = 1;
+    }
+}
+```
+
+### 분석
+
+`chall04()`는 전달받은 문자열이 `"frida"`와 일치할 때만 `completeArr[3]`을 `1`로 변경합니다.
+
+### Frida 접근
+
+`MainActivity` 인스턴스를 찾은 뒤 `chall04("frida")`를 직접 호출했습니다.
+
+```javascript
+instance.chall04("frida");
+```
+
+### 실행 결과
+
+![Challenge 04 결과](image/chall04-result.png)
+
+## Challenge 05 - Runtime Argument 변조
+
+### 목표
+
+`chall05()`에 항상 `"frida"` 문자열이 전달되도록 만들어 검증 조건을 유지하는 문제입니다.
+
+### 원본 코드
+
+```java
+public void chall05(String str) {
+    if (str.equals("frida")) {
+        this.completeArr[4] = 1;
+    } else {
+        this.completeArr[4] = 0;
+    }
+}
+```
+
+### 분석
+
+Challenge 04와 유사하지만, `chall05()`는 `"frida"`가 아닌 값이 들어오면 `completeArr[4]`를 다시 `0`으로 초기화합니다. 실제 실행 중 `CHECK` 버튼을 누르면 앱이 `"notfrida!"`와 같은 잘못된 값을 전달할 수 있으므로, 단순히 한 번 `chall05("frida")`를 호출하는 방식만으로는 안정적이지 않습니다.
+
+### Frida 접근
+
+`chall05()`를 후킹하여 원래 인자가 무엇이든 `"frida"`를 전달하도록 변경했습니다.
+
+```javascript
+MainActivity.chall05.overload("java.lang.String").implementation = function (str) {
+    return this.chall05.overload("java.lang.String").call(this, "frida");
+};
+```
+
+### 실행 결과
+
+![Challenge 05 결과](image/chall05-result.png)
+
+## Challenge 06 - Time-based Condition 처리
+
+### 목표
+
+10초 이후 올바른 값을 전달하여 `chall06()` 검증 조건을 통과시키는 문제입니다.
+
+### 원본 코드
+
+```java
+public static boolean confirmChall06(int i) {
+    return i == chall06 && System.currentTimeMillis() > timeStart + 10000;
+}
+```
+
+### 분석
+
+`confirmChall06()`은 두 가지 조건을 동시에 확인합니다.
+
+- 전달된 인자 `i`가 현재 static field인 `chall06` 값과 같아야 합니다.
+- `timeStart` 기준으로 10초 이상 지나야 합니다.
+
+따라서 무조건 `true`를 반환하도록 우회할 수도 있지만, 이 풀이에서는 원래 조건을 만족시키는 방식으로 진행했습니다.
+
+### Frida 접근
+
+11초를 기다린 뒤 현재 `challenge_06.chall06` 값을 읽고, 해당 값을 `MainActivity.chall06()`에 전달했습니다.
+
+```javascript
+setTimeout(() => {
+    Java.choose("uk.rossmarks.fridalab.MainActivity", {
+        onMatch: (instance) => {
+            const value = Challenge06.chall06.value;
+            instance.chall06(value);
+        }
+    });
+}, 11000);
+```
+
+### 실행 결과
+
+![Challenge 06 결과](image/chall06-result.png)
+
+## Challenge 07 - Runtime PIN 값 확인
+
+### 목표
+
+런타임에 생성된 4자리 PIN 값을 확인하여 `chall07()` 검증을 통과시키는 문제입니다.
+
+### 원본 코드
+
+```java
+public static void setChall07() {
+    chall07 = BuildConfig.FLAVOR + (((int) (Math.random() * 9000.0d)) + 1000);
+}
+
+public static boolean check07Pin(String str) {
+    return str.equals(chall07);
+}
+```
+
+### 분석
+
+`setChall07()`은 1000부터 9999 사이의 랜덤 값을 생성하고, 이를 static field인 `chall07`에 문자열로 저장합니다. `BuildConfig.FLAVOR`는 빈 문자열이므로 실제로는 랜덤 4자리 숫자가 `chall07`에 저장됩니다.
+
+정답 PIN은 런타임 메모리에 존재하므로 Frida로 해당 static field 값을 읽을 수 있습니다.
+
+### Frida 접근
+
+`challenge_07.chall07.value`를 읽은 뒤, 해당 값을 `chall07()`에 전달했습니다.
+
+```javascript
+const pin = Challenge07.chall07.value;
+instance.chall07(pin);
+```
+
+### 실행 결과
+
+![Challenge 07 결과](image/chall07-result.png)
+
+## Challenge 08 - UI Text 조작
+
+### 목표
+
+`CHECK` 버튼의 text 값을 `"Confirm"`으로 변경하여 검증 조건을 통과시키는 문제입니다.
+
+### 원본 코드
+
+```java
+public boolean chall08() {
+    return ((String) ((Button) findViewById(R.id.check)).getText()).equals("Confirm");
+}
+```
+
+### 분석
+
+`chall08()`은 `R.id.check`에 해당하는 버튼 객체를 찾고, 해당 버튼의 text 값이 `"Confirm"`인지 확인합니다. 따라서 버튼의 text를 실제로 `"Confirm"`으로 변경하면 조건을 만족할 수 있습니다.
+
+Android UI 객체를 변경하는 작업은 main thread에서 수행하는 것이 안전하므로, Frida의 `Java.scheduleOnMainThread()`를 사용했습니다.
+
+### Frida 접근
+
+`findViewById()`로 버튼 객체를 가져온 뒤 `android.widget.Button`으로 캐스팅하고, `setText()`를 호출하여 버튼 텍스트를 변경했습니다.
+
+```javascript
+Java.scheduleOnMainThread(() => {
+    const Button = Java.use("android.widget.Button");
+    const StringClass = Java.use("java.lang.String");
+    const R_id = Java.use("uk.rossmarks.fridalab.R$id");
+
+    const checkButton = Java.cast(
+        instance.findViewById(R_id.check.value),
+        Button
+    );
+
+    const confirmText = StringClass.$new("Confirm");
+
+    checkButton.setText
+        .overload("java.lang.CharSequence")
+        .call(checkButton, confirmText);
+});
+```
+
+### 실행 결과
+
+Challenge 08까지 통과하면 1번부터 8번까지 모든 항목이 초록색으로 표시됩니다.
+
+![Challenge 08 및 전체 완료 결과](image/all-solved.png)
+
+## 최종 스크립트
+
+전체 Challenge를 처리하는 누적 Frida 스크립트는 다음 경로에 정리했습니다.
+
+```text
+scripts/FridaLab.js
+```
+
+실행 명령어:
+
+```bash
+frida -U -f uk.rossmarks.fridalab -l scripts/FridaLab.js
+```
+
+## 최종 결과
+
+Frida를 이용해 1번부터 8번까지 모든 Challenge의 검증 조건을 통과시켰습니다.
+
+![전체 완료 결과](image/all-solved.png)
+
+## 참고
+
+이 프로젝트는 Android 동적 분석 및 Frida 사용법 학습을 위한 교육 목적의 실습입니다. 실제 서비스나 제3자 애플리케이션을 대상으로 하지 않았습니다.
