@@ -11,12 +11,6 @@ Android 동적 분석 실습 앱인 FridaLab을 대상으로 Frida를 활용해 
 - Tools: ADB, Frida, frida-server, JADX / JADX-GUI
 - Target Package: `uk.rossmarks.fridalab`
 
-## 초기 상태
-
-앱 실행 직후에는 모든 Challenge가 빨간색으로 표시됩니다.
-
-![초기 상태](image/initial-state.png)
-
 ## Challenge 요약
 
 | Challenge | 주요 기법 | 상태 |
@@ -29,6 +23,12 @@ Android 동적 분석 실습 앱인 FridaLab을 대상으로 Frida를 활용해 
 | 06 | Time-based condition 처리 | Solved |
 | 07 | Runtime PIN 값 확인 | Solved |
 | 08 | UI text 조작 | Solved |
+
+## 초기 상태
+
+앱 실행 직후에는 모든 Challenge가 빨간색으로 표시됩니다.
+
+![초기 상태](image/initial-state.png)
 
 ## Challenge 01 - Static Field / Return Value 조작
 
